@@ -1,0 +1,4 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{% block title %}Raíces de Bienestar{% endblock %}</title><link rel="stylesheet" href="{{url_for('static',filename='style.css')}}"></head><body>
+<header><a class="brand" href="/"><span>🌱</span><b>Raíces de Bienestar</b></a><nav><a href="/">Inicio</a><a href="/recursos">Recursos</a><a href="/chat">Chat</a>{% if user %}<a href="/panel">Mi bienestar</a><a class="outline" href="/salir">Salir</a>{% else %}<a href="/login">Ingresar</a><a class="btn small" href="/registro">Crear cuenta</a>{% endif %}</nav></header>
+{% with messages=get_flashed_messages(with_categories=true) %}{% for cat,msg in messages %}<div class="flash {{cat}}">{{msg}}</div>{% endfor %}{% endwith %}
+{% block content %}{% endblock %}<footer><b>🌱 Raíces de Bienestar</b><span>Un espacio educativo para el cuidado emocional y la convivencia.</span></footer></body></html>
