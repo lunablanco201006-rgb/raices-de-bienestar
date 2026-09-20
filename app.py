@@ -126,19 +126,108 @@ def chat():
 
 @app.route("/api/chat", methods=["POST"])
 def chat_api():
-    text=(request.get_json(silent=True) or {}).get("message","").strip().lower()
-    if not text: return jsonify(reply="Cuéntame un poco más sobre lo que estás sintiendo.")
-    crisis=["suicid","matarme","hacerme daño","hacerme daño","no quiero vivir","autoles"]
-    if any(k in text for k in crisis):
-        return jsonify(reply="Siento que estés pasando por algo tan difícil. No estás solo/a. Busca ahora mismo a una persona de confianza y ayuda profesional o de emergencias de tu localidad. Si existe un peligro inmediato, contacta a emergencias y no te quedes solo/a.")
-    if any(k in text for k in ["ansiedad","ansioso","angustia","pánico","estres"]):
-        return jsonify(reply="Prueba esto: apoya los pies en el suelo, inhala suavemente durante 4 segundos y exhala durante 6. Repite durante un par de minutos. Después, si puedes, habla con alguien de confianza.")
-    if any(k in text for k in ["triste","llorar","solo","sola","mal"]):
-        return jsonify(reply="Gracias por expresarlo. Tus emociones merecen ser escuchadas. Intenta acercarte a alguien de confianza y date permiso para ir paso a paso. Si esto persiste o interfiere con tu vida, considera hablar con un profesional.")
-    if any(k in text for k in ["hola","buenas","hey"]):
-        return jsonify(reply="¡Hola! 🌱 Estoy aquí para escucharte. ¿Cómo te sientes hoy?")
-    return jsonify(reply="Te escucho. Puedes contarme qué ocurrió, cómo te hizo sentir o qué necesitas en este momento. Este chat ofrece orientación general y no sustituye atención profesional.")
+    data = request.get_json(silent=True) or {}
+    original_text = data.get("message", "").strip()
+    text = original_text.lower()
 
+    if not original_text:
+        return jsonify(reply="Cuéntame un poco más sobre lo que estás sintiendo.")
+
+    # Situaciones de riesgo
+    crisis = [
+        "suicid", "matarme", "hacerme daño",
+        "no quiero vivir", "autoles"
+    ]
+
+    if any(k in text for k in crisis):
+        return jsonify(reply=(
+            "Siento que estés pasando por algo tan difícil. "
+            "No estás solo/a. Busca ahora mismo a una persona de confianza "
+            "y ayuda profesional. Si existe un peligro inmediato, "
+            "contacta a los servicios de emergencia de tu localidad "
+            "y no te quedes solo/a."
+        ))
+
+    # Clave de Gemini guardada en Render
+    api_key = os.environ.get("GEMINI_API_KEY")
+
+    if not api_key:
+        return jsonify(reply=(
+            "En este momento el asistente no está disponible. "
+            "Por favor, intenta nuevamente más tarde."
+        ))
+
+    prompt = f"""
+Eres el asistente de orientación de "Raíces de Bienestar",
+una plataforma escolar de apoyo emocional para estudiantes.
+
+Tu función es escuchar, orientar y responder con empatía.
+
+REGLAS:
+- Responde en español.
+- Usa lenguaje sencillo apropiado para estudiantes.
+- Sé amable, empático y respetuoso.
+- No diagnostiques enfermedades.
+- No sustituyas a la psicóloga ni a profesionales.
+- No inventes información.
+- Da respuestas breves y claras.
+- Si el estudiante cuenta un problema, valida primero lo que siente
+  y después ofrece una orientación práctica.
+- Si existe una situación de riesgo, recomienda buscar inmediatamente
+  ayuda de un adulto de confianza y servicios profesionales.
+- No digas que eres una persona.
+
+Mensaje del estudiante:
+{original_text}
+"""
+
+    url = (
+        "https://generativelanguage.googleapis.com/"
+        "v1beta/models/gemini-2.5-flash:generateContent"
+    )
+
+    payload = {
+        "contents": [
+            {
+                "parts": [
+                    {"text": prompt}
+                ]
+            }
+        ]
+    }
+
+    try:
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "x-goog-api-key": api_key
+            },
+            method="POST"
+        )
+
+        with urllib.request.urlopen(req, timeout=30) as response:
+            result = json.loads(response.read().decode("utf-8"))
+
+        reply = (
+            result.get("candidates", [{}])[0]
+            .get("content", {})
+            .get("parts", [{}])[0]
+            .get("text")
+        )
+
+        if not reply:
+            reply = "No pude generar una respuesta en este momento."
+
+        return jsonify(reply=reply)
+
+    except Exception as e:
+        print("ERROR GEMINI:", e)
+        return jsonify(reply=(
+            "No pude conectarme con el asistente en este momento. "
+            "Por favor, intenta nuevamente."
+        ))
 init_db()
 if __name__=="__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT",5000)))
